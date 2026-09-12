@@ -1,0 +1,251 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-seed-orders
+      author: dainz
+      changes:
+        - insert:
+            tableName: orders
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: customer_id
+                  valueNumeric: 101
+              - column:
+                  name: status
+                  value: CREADO
+              - column:
+                  name: total_amount
+                  valueNumeric: 15000
+              - column:
+                  name: created_at
+                  valueDate: "2026-09-01T10:00:00"
+              - column:
+                  name: updated_at
+                  valueDate: "2026-09-01T10:00:00"
+
+        - insert:
+            tableName: orders
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 2
+              - column:
+                  name: customer_id
+                  valueNumeric: 102
+              - column:
+                  name: status
+                  value: EN_PREPARACION
+              - column:
+                  name: total_amount
+                  valueNumeric: 34500
+              - column:
+                  name: created_at
+                  valueDate: "2026-09-05T14:30:00"
+              - column:
+                  name: updated_at
+                  valueDate: "2026-09-05T15:00:00"
+
+        - insert:
+            tableName: orders
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 3
+              - column:
+                  name: customer_id
+                  valueNumeric: 103
+              - column:
+                  name: status
+                  value: ENTREGADO
+              - column:
+                  name: total_amount
+                  valueNumeric: 8900
+              - column:
+                  name: created_at
+                  valueDate: "2026-09-08T09:15:00"
+              - column:
+                  name: updated_at
+                  valueDate: "2026-09-09T11:00:00"
+
+        - insert:
+            tableName: orders
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 4
+              - column:
+                  name: customer_id
+                  valueNumeric: 101
+              - column:
+                  name: status
+                  value: CANCELADO
+              - column:
+                  name: total_amount
+                  valueNumeric: 5200
+              - column:
+                  name: created_at
+                  valueDate: "2026-09-10T16:45:00"
+              - column:
+                  name: updated_at
+                  valueDate: "2026-09-10T17:00:00"
+
+        - insert:
+            tableName: orders
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 5
+              - column:
+                  name: customer_id
+                  valueNumeric: 104
+              - column:
+                  name: status
+                  value: DESPACHADO
+              - column:
+                  name: total_amount
+                  valueNumeric: 22000
+              - column:
+                  name: created_at
+                  valueDate: "2026-09-11T08:00:00"
+              - column:
+                  name: updated_at
+                  valueDate: "2026-09-11T09:30:00"
+
+  - changeSet:
+      id: 002-seed-order-items
+      author: dainz
+      changes:
+        # Items for order 1
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: product_id
+                  valueNumeric: 201
+              - column:
+                  name: quantity
+                  valueNumeric: 2
+              - column:
+                  name: unit_price
+                  valueNumeric: 5000
+
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: product_id
+                  valueNumeric: 202
+              - column:
+                  name: quantity
+                  valueNumeric: 1
+              - column:
+                  name: unit_price
+                  valueNumeric: 5000
+
+        # Items for order 2
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 2
+              - column:
+                  name: product_id
+                  valueNumeric: 203
+              - column:
+                  name: quantity
+                  valueNumeric: 3
+              - column:
+                  name: unit_price
+                  valueNumeric: 10000
+
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 2
+              - column:
+                  name: product_id
+                  valueNumeric: 204
+              - column:
+                  name: quantity
+                  valueNumeric: 1
+              - column:
+                  name: unit_price
+                  valueNumeric: 4500
+
+        # Items for order 3
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 3
+              - column:
+                  name: product_id
+                  valueNumeric: 201
+              - column:
+                  name: quantity
+                  valueNumeric: 1
+              - column:
+                  name: unit_price
+                  valueNumeric: 8900
+
+        # Items for order 4
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 4
+              - column:
+                  name: product_id
+                  valueNumeric: 205
+              - column:
+                  name: quantity
+                  valueNumeric: 2
+              - column:
+                  name: unit_price
+                  valueNumeric: 2600
+
+        # Items for order 5
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 5
+              - column:
+                  name: product_id
+                  valueNumeric: 203
+              - column:
+                  name: quantity
+                  valueNumeric: 2
+              - column:
+                  name: unit_price
+                  valueNumeric: 8000
+
+        - insert:
+            tableName: order_item
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 5
+              - column:
+                  name: product_id
+                  valueNumeric: 206
+              - column:
+                  name: quantity
+                  valueNumeric: 1
+              - column:
+                  name: unit_price
+                  valueNumeric: 6000
