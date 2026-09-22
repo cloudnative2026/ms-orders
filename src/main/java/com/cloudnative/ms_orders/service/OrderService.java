@@ -33,6 +33,12 @@ public class OrderService {
                 .toList();
     }
 
+    public List<OrderResponseDTO> findByCustomerId(int customerId) {
+        return orderRepository.findByCustomerId(customerId).stream()
+                .map(this::toResponseDTO)
+                .toList();
+    }
+
     public Optional<OrderResponseDTO> findById(int id) {
         return orderRepository.findById(id)
                 .map(this::toResponseDTO);

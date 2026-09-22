@@ -61,7 +61,7 @@ databaseChangeLog:
                   value: ENTREGADO
               - column:
                   name: total_amount
-                  valueNumeric: 8900
+                  valueNumeric: 5000
               - column:
                   name: created_at
                   valueDate: "2026-09-08T09:15:00"
@@ -105,7 +105,7 @@ databaseChangeLog:
                   value: DESPACHADO
               - column:
                   name: total_amount
-                  valueNumeric: 22000
+                  valueNumeric: 26000
               - column:
                   name: created_at
                   valueDate: "2026-09-11T08:00:00"
@@ -198,7 +198,7 @@ databaseChangeLog:
                   valueNumeric: 1
               - column:
                   name: unit_price
-                  valueNumeric: 8900
+                  valueNumeric: 5000
 
         # Items for order 4
         - insert:
@@ -232,7 +232,7 @@ databaseChangeLog:
                   valueNumeric: 2
               - column:
                   name: unit_price
-                  valueNumeric: 8000
+                  valueNumeric: 10000
 
         - insert:
             tableName: order_item
@@ -249,3 +249,6 @@ databaseChangeLog:
               - column:
                   name: unit_price
                   valueNumeric: 6000
+
+        - sql:
+            sql: SELECT setval('orders_id_seq', (SELECT COALESCE(MAX(id), 1) FROM orders))
