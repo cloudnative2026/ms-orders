@@ -24,7 +24,7 @@ public class OrderController {
     @GetMapping("/{id}")
     public OrderResponseDTO get(@PathVariable long id, JwtAuthenticationToken auth) { return service.findById(id, auth); }
     @PostMapping
-    @PreAuthorize("hasAnyRole('Admin', 'Operador')")
+    @PreAuthorize("hasAnyRole('Admin', 'Operador', 'Cliente')")
     public ResponseEntity<OrderResponseDTO> create(@Valid @RequestBody OrderRequestDTO body, JwtAuthenticationToken auth) {
         var order = service.createOrder(body, auth);
         return ResponseEntity.created(URI.create("/api/v1/orders/" + order.id())).body(order);

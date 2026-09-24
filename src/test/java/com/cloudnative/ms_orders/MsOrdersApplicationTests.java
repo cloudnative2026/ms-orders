@@ -98,7 +98,7 @@ class MsOrdersApplicationTests {
         mvc.perform(get(URL)).andExpect(status().isUnauthorized());
         mvc.perform(get(URL).header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
         mvc.perform(get(URL).header("Authorization", "Bearer Auditor")).andExpect(status().isForbidden());
-        mvc.perform(post(URL).header("Authorization", "Bearer Cliente").contentType("application/json").content(BODY))
+        mvc.perform(post(URL).header("Authorization", "Bearer Auditor").contentType("application/json").content(BODY))
             .andExpect(status().isForbidden());
         String location = create();
         mvc.perform(delete(location).header("Authorization", "Bearer Operador")).andExpect(status().isForbidden());
@@ -151,6 +151,19 @@ class MsOrdersApplicationTests {
             .isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
         assertThat(orders.findById(first.getId()).orElseThrow().getStatus())
             .isEqualTo(com.cloudnative.ms_orders.model.OrderStatus.ACEPTADO);
+    }
+    @Test void customerCanCreateAndOnlyReadOwnOrders() throws Exception {
+        String location = mvc.perform(post(URL).header("Authorization", "Bearer Cliente")
+            .contentType("application/json").content(BODY))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.totalAmount").value(20.50))
+            .andReturn().getResponse().getHeader("Location");
+        mvc.perform(get(location).header("Authorization", "Bearer Cliente")).andExpect(status().isOk());
+        mvc.perform(get(URL).header("Authorization", "Bearer Cliente")).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get(location).header("Authorization", "Bearer other")).andExpect(status().isNotFound());
+        mvc.perform(get(URL).header("Authorization", "Bearer other")).andExpect(content().json("[]"));
+        mvc.perform(get(URL).header("Authorization", "Bearer Admin")).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(put(location).header("Authorization", "Bearer Cliente").contentType("application/json").content(BODY)).andExpect(status().isForbidden());
+        mvc.perform(delete(location).header("Authorization", "Bearer Cliente")).andExpect(status().isForbidden());
     }
     @Test void missingSubjectIsRejected() throws Exception {
         when(decoder.decode("no-subject")).thenReturn(Jwt.withTokenValue("no-subject")
