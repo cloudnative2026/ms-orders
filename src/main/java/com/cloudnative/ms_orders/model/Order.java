@@ -1,52 +1,37 @@
 package com.cloudnative.ms_orders.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@AllArgsConstructor
-@NoArgsConstructor
 @Entity
 @Data
+@NoArgsConstructor
 @Table(name = "orders")
 public class Order {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
-
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     @Column(nullable = false)
     private int customerId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    // Exact JWT identity; numeric customerId is business metadata, never an access credential.
+    @Column(length = 512)
+    private String ownerSubject;
+    @Column(length = 512)
+    private String ownerIssuer;
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30)
     private OrderStatus status;
-
     @ElementCollection
-    @CollectionTable(name = "OrderItem", joinColumns = @JoinColumn(name = "id"))
-    @Column(nullable = false)
+    @CollectionTable(name = "order_item", joinColumns = @JoinColumn(name = "id"))
     private List<OrderItem> items;
-
-    @Column(nullable = false)
-    private int totalAmount;
-
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalAmount;
     @Column(nullable = false)
     private LocalDateTime createdAt;
-
     @Column(nullable = false)
     private LocalDateTime updatedAt;
-
+    @Version @Column(nullable = false)
+    private Long version;
 }

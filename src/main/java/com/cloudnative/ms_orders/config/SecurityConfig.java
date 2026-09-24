@@ -29,43 +29,17 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(token -> {
+                            if (token.getSubject() == null || token.getSubject().isBlank()
+                                    || token.getSubject().length() > 512 || token.getIssuer() == null
+                                    || token.getIssuer().toString().length() > 512) {
+                                throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_token");
+                            }
+                            return jwtAuthenticationConverter().convert(token);
+                        }))
                 );
 
         return http.build();
-    }
-
-    @Bean
-    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
-        String jwkSetUri = "https://login.microsoftonline.com/f9bce5c0-eb96-4341-aad7-411ae980b12a/discovery/v2.0/keys";
-        org.springframework.security.oauth2.jwt.NimbusJwtDecoder jwtDecoder =
-                org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-
-        List<String> validIssuers = List.of(
-                "https://login.microsoftonline.com/f9bce5c0-eb96-4341-aad7-411ae980b12a/v2.0",
-                "https://sts.windows.net/f9bce5c0-eb96-4341-aad7-411ae980b12a/"
-        );
-
-        org.springframework.security.oauth2.core.OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> validator =
-                new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
-                        new org.springframework.security.oauth2.jwt.JwtTimestampValidator(),
-                        token -> {
-                            String issuer = token.getIssuer() != null ? token.getIssuer().toString() : "";
-                            if (validIssuers.contains(issuer) || issuer.contains("f9bce5c0-eb96-4341-aad7-411ae980b12a")) {
-                                return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success();
-                            }
-                            return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
-                                    new org.springframework.security.oauth2.core.OAuth2Error(
-                                            "invalid_token",
-                                            "The iss claim is not valid: " + issuer,
-                                            null
-                                    )
-                            );
-                        }
-                );
-
-        jwtDecoder.setJwtValidator(validator);
-        return jwtDecoder;
     }
 
     @Bean
