@@ -26,18 +26,17 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(token -> {
                             if (token.getSubject() == null || token.getSubject().isBlank()
                                     || token.getSubject().length() > 512 || token.getIssuer() == null
                                     || token.getIssuer().toString().length() > 512) {
-                                throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_token");
+                                throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException(
+                                        "invalid_token");
                             }
                             return jwtAuthenticationConverter().convert(token);
-                        }))
-                );
+                        })));
 
         return http.build();
     }
@@ -54,7 +53,8 @@ public class SecurityConfig {
 
     private CorsConfiguration corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5500", "http://localhost:5173"));
+        config.setAllowedOrigins(
+                List.of("http://localhost:5500", "http://localhost:5173", "https://cloudnative2026.github.io"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         return config;
