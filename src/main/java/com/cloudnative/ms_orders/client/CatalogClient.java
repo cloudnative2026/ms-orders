@@ -13,16 +13,18 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 public class CatalogClient {
     private final RestClient client;
+
     public CatalogClient(@Value("${catalog.service.url}") String url) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3)).build());
+                .connectTimeout(Duration.ofSeconds(3)).build());
         factory.setReadTimeout(Duration.ofSeconds(5));
         client = RestClient.builder().baseUrl(url).requestFactory(factory).build();
     }
+
     public ProductDTO getProductById(long id, String token) {
         try {
-            ProductDTO product = client.get().uri("/api/catalog/products/{id}", id)
-                .headers(headers -> headers.setBearerAuth(token)).retrieve().body(ProductDTO.class);
+            ProductDTO product = client.get().uri("/api/v1/catalog/{id}", id)
+                    .headers(headers -> headers.setBearerAuth(token)).retrieve().body(ProductDTO.class);
             if (product == null || product.id() == null || product.id() != id || product.price() == null
                     || product.price().signum() < 0 || product.price().scale() > 2
                     || product.price().precision() - product.price().scale() > 17) {

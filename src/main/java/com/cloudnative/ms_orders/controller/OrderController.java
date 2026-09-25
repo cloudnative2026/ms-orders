@@ -18,25 +18,42 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasAnyRole('Admin', 'Operador', 'Cliente')")
 public class OrderController {
     private final OrderService service;
-    public OrderController(OrderService service) { this.service = service; }
+
+    public OrderController(OrderService service) {
+        this.service = service;
+    }
+
     @GetMapping
-    public List<OrderResponseDTO> getAll(JwtAuthenticationToken auth) { return service.findAll(auth); }
+    public List<OrderResponseDTO> getAll(JwtAuthenticationToken auth) {
+        return service.findAll(auth);
+    }
+
     @GetMapping("/{id}")
-    public OrderResponseDTO get(@PathVariable long id, JwtAuthenticationToken auth) { return service.findById(id, auth); }
+    public OrderResponseDTO get(@PathVariable long id, JwtAuthenticationToken auth) {
+        return service.findById(id, auth);
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('Admin', 'Operador', 'Cliente')")
-    public ResponseEntity<OrderResponseDTO> create(@Valid @RequestBody OrderRequestDTO body, JwtAuthenticationToken auth) {
+    public ResponseEntity<OrderResponseDTO> create(@Valid @RequestBody OrderRequestDTO body,
+            JwtAuthenticationToken auth) {
         var order = service.createOrder(body, auth);
         return ResponseEntity.created(URI.create("/api/v1/orders/" + order.id())).body(order);
     }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('Admin', 'Operador')")
-    public OrderResponseDTO update(@PathVariable long id, @Valid @RequestBody OrderRequestDTO body, JwtAuthenticationToken auth) {
+    public OrderResponseDTO update(@PathVariable long id, @Valid @RequestBody OrderRequestDTO body,
+            JwtAuthenticationToken auth) {
         return service.updateOrder(id, body, auth);
     }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('Admin', 'Operador')")
-    public OrderResponseDTO status(@PathVariable long id, @RequestParam OrderStatus status) { return service.updateStatus(id, status); }
+    public OrderResponseDTO status(@PathVariable long id, @RequestParam OrderStatus status) {
+        return service.updateStatus(id, status);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<Void> delete(@PathVariable long id) {
