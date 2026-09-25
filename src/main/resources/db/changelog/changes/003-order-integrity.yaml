@@ -22,10 +22,10 @@ databaseChangeLog:
                     nullable: false
               - column:
                   name: owner_subject
-                  type: VARCHAR(512)
+                  type: VARCHAR(255)
               - column:
                   name: owner_issuer
-                  type: VARCHAR(512)
+                  type: VARCHAR(255)
         - createIndex:
             tableName: orders
             indexName: idx_orders_owner
