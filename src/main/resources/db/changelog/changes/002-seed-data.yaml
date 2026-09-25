@@ -249,6 +249,3 @@ databaseChangeLog:
               - column:
                   name: unit_price
                   valueNumeric: 6000
-
-        - sql:
-            sql: SELECT setval('orders_id_seq', (SELECT COALESCE(MAX(id), 1) FROM orders))
