@@ -72,12 +72,16 @@ jobs:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           URL_CATALOG: ${{ secrets.GATEWAY_IP}}
+          RABBITMQ_HOST: ${{ secrets.RABBITMQ_HOST }}
+          RABBITMQ_PORT: ${{ secrets.RABBITMQ_PORT }}
+          RABBITMQ_USERNAME: ${{ secrets.RABBITMQ_USERNAME }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
 
-          envs:  AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION,ECR_REGISTRY,ECR_REPO,DB_HOST,DB_PORT,DB_USERNAME,DB_PASSWORD, URL_CATALOG
+          envs:  AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION,ECR_REGISTRY,ECR_REPO,DB_HOST,DB_PORT,DB_USERNAME,DB_PASSWORD, URL_CATALOG,RABBITMQ_HOST,RABBITMQ_PORT,RABBITMQ_USERNAME,RABBITMQ_PASSWORD
 
           script: |
             set -e
@@ -110,6 +114,10 @@ jobs:
             -e DB_USERNAME="$DB_USERNAME" \
             -e DB_PASSWORD="$DB_PASSWORD" \
             -e MS_CATALOG="$URL_CATALOG" \
+            -e SPRING_RABBITMQ_HOST="$RABBITMQ_HOST" \
+            -e SPRING_RABBITMQ_PORT="$RABBITMQ_PORT" \
+            -e SPRING_RABBITMQ_USERNAME="$RABBITMQ_USERNAME" \
+            -e SPRING_RABBITMQ_PASSWORD="$RABBITMQ_PASSWORD" \
             "$ECR_REPO:latest"
 
             echo "Deployment completed."
