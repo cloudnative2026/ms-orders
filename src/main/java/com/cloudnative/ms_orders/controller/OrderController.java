@@ -3,6 +3,7 @@ package com.cloudnative.ms_orders.controller;
 import java.net.URI;
 import java.util.List;
 import jakarta.validation.Valid;
+import com.cloudnative.ms_orders.client.NotificationClient;
 import com.cloudnative.ms_orders.dto.*;
 import com.cloudnative.ms_orders.model.OrderStatus;
 import com.cloudnative.ms_orders.service.OrderService;
@@ -18,9 +19,11 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasAnyRole('Admin', 'Operador', 'Cliente')")
 public class OrderController {
     private final OrderService service;
+    private final NotificationClient notifications;
 
-    public OrderController(OrderService service) {
+    public OrderController(OrderService service, NotificationClient notifications) {
         this.service = service;
+        this.notifications = notifications;
     }
 
     @GetMapping
@@ -38,6 +41,8 @@ public class OrderController {
     public ResponseEntity<OrderResponseDTO> create(@Valid @RequestBody OrderRequestDTO body,
             JwtAuthenticationToken auth) {
         var order = service.createOrder(body, auth);
+        // Published here, after the service transaction has committed.
+        notifications.orderCreated(order, auth.getToken().getSubject());
         return ResponseEntity.created(URI.create("/api/v1/orders/" + order.id())).body(order);
     }
 

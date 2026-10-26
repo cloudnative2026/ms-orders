@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import com.cloudnative.ms_orders.client.CatalogClient;
+import com.cloudnative.ms_orders.client.NotificationClient;
 import com.cloudnative.ms_orders.dto.ProductDTO;
 import com.cloudnative.ms_orders.repository.OrderRepository;
 import org.junit.jupiter.api.*;
@@ -27,6 +28,7 @@ class MsOrdersApplicationTests {
     @Autowired OrderRepository orders;
     @MockitoBean JwtDecoder decoder;
     @MockitoBean CatalogClient catalog;
+    @MockitoBean NotificationClient notifications;
     static final String URL = "/api/v1/orders";
     static final String BODY = """
         {"customerId":101,"items":[{"productId":1,"quantity":2}]}
@@ -116,6 +118,7 @@ class MsOrdersApplicationTests {
         mvc.perform(post(URL).header("Authorization", "Bearer Admin").contentType("application/json").content(BODY))
             .andExpect(status().isBadRequest());
         assertThat(orders.count()).isZero();
+        verifyNoInteractions(notifications);
         when(catalog.getProductById(1L, "Admin")).thenThrow(new org.springframework.web.server.ResponseStatusException(
             org.springframework.http.HttpStatus.BAD_GATEWAY, "Catalogo no disponible"));
         mvc.perform(post(URL).header("Authorization", "Bearer Admin").contentType("application/json").content(BODY))
@@ -158,6 +161,7 @@ class MsOrdersApplicationTests {
             .andExpect(status().isCreated()).andExpect(jsonPath("$.totalAmount").value(20.50))
             .andReturn().getResponse().getHeader("Location");
         mvc.perform(get(location).header("Authorization", "Bearer Cliente")).andExpect(status().isOk());
+        verify(notifications).orderCreated(argThat(o -> location.endsWith("/" + o.id())), eq("Cliente"));
         mvc.perform(get(URL).header("Authorization", "Bearer Cliente")).andExpect(jsonPath("$.length()").value(1));
         mvc.perform(get(location).header("Authorization", "Bearer other")).andExpect(status().isNotFound());
         mvc.perform(get(URL).header("Authorization", "Bearer other")).andExpect(content().json("[]"));
