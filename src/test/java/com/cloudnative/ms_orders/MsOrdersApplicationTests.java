@@ -26,6 +26,8 @@ import static org.assertj.core.api.Assertions.*;
 class MsOrdersApplicationTests {
     @Autowired MockMvc mvc;
     @Autowired OrderRepository orders;
+    @Autowired com.cloudnative.ms_orders.service.ReceiptService receiptService;
+    @Autowired com.cloudnative.ms_orders.repository.ReceiptRepository receipts;
     @MockitoBean JwtDecoder decoder;
     @MockitoBean CatalogClient catalog;
     @MockitoBean NotificationClient notifications;
@@ -34,6 +36,7 @@ class MsOrdersApplicationTests {
         {"customerId":101,"items":[{"productId":1,"quantity":2}]}
         """;
     @BeforeEach void setup() {
+        receipts.deleteAll();
         orders.deleteAll();
         for (String role : List.of("Admin", "Operador", "Cliente", "Auditor")) token(role, role, role);
         token("other", "Cliente", "other");
@@ -173,5 +176,51 @@ class MsOrdersApplicationTests {
         when(decoder.decode("no-subject")).thenReturn(Jwt.withTokenValue("no-subject")
             .header("alg", "RS256").issuer("https://issuer.example").claim("roles", List.of("Admin")).build());
         mvc.perform(get(URL).header("Authorization", "Bearer no-subject")).andExpect(status().isUnauthorized());
+    }
+
+    @Test void receiptIsDurableIdempotentAndKeepsHistoricalPrices() throws Exception {
+        var location = create();
+        long id = Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
+        mvc.perform(get(location + "/receipt").header("Authorization", "Bearer Admin"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("NOT_REQUESTED"));
+        for (int i = 0; i < 2; i++) mvc.perform(post(location + "/receipt").header("Authorization", "Bearer Admin"))
+            .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("PENDING"));
+        assertThat(receipts.count()).isEqualTo(1);
+        mvc.perform(put(location).header("Authorization", "Bearer Admin")
+            .contentType("application/json").content(BODY.replace(":2", ":3")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalAmount").value(30.75));
+        clearInvocations(catalog);
+        receiptService.generate(id);
+        var first = receipts.findById(id).orElseThrow();
+        assertThat(first.getHtml()).contains("Boleta B-" + id, "$20.50", "$10.25", "Producto #1").doesNotContain("$30.75");
+        receiptService.generate(id);
+        var second = receipts.findById(id).orElseThrow();
+        assertThat(second.getHtml()).isEqualTo(first.getHtml());
+        assertThat(second.getGeneratedAt()).isEqualTo(first.getGeneratedAt());
+        verifyNoInteractions(catalog);
+        mvc.perform(post(location + "/receipt").header("Authorization", "Bearer Admin"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("READY"));
+        mvc.perform(get(location + "/receipt").header("Authorization", "Bearer Operador"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.number").value("B-" + id));
+        mvc.perform(delete(location).header("Authorization", "Bearer Admin")).andExpect(status().isNoContent());
+        assertThat(receipts.findById(id)).isEmpty();
+    }
+
+    @Test void receiptRequiresOwnershipAndRole() throws Exception {
+        var location = mvc.perform(post(URL).header("Authorization", "Bearer Cliente")
+            .contentType("application/json").content(BODY)).andExpect(status().isCreated())
+            .andReturn().getResponse().getHeader("Location");
+        for (String method : List.of("GET", "POST")) {
+            mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method), location + "/receipt"))
+                .andExpect(status().isUnauthorized());
+            mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method), location + "/receipt")
+                .header("Authorization", "Bearer other")).andExpect(status().isNotFound());
+            mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method), location + "/receipt")
+                .header("Authorization", "Bearer Auditor")).andExpect(status().isForbidden());
+        }
+        mvc.perform(post(location + "/receipt").header("Authorization", "Bearer Cliente"))
+            .andExpect(status().isAccepted());
+        mvc.perform(get(location + "/receipt").header("Authorization", "Bearer Cliente"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
     }
 }

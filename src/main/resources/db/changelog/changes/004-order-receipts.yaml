@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-order-receipts
+      author: pedidos360
+      changes:
+        - createTable:
+            tableName: order_receipt
+            columns:
+              - column:
+                  name: order_id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: snapshot
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: requested_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: generated_at
+                  type: TIMESTAMP
+              - column:
+                  name: html
+                  type: TEXT
+        - addForeignKeyConstraint:
+            baseTableName: order_receipt
+            baseColumnNames: order_id
+            referencedTableName: orders
+            referencedColumnNames: id
+            constraintName: fk_receipt_order
+            onDelete: CASCADE
+        - createIndex:
+            tableName: order_receipt
+            indexName: idx_receipt_pending
+            columns:
+              - column:
+                  name: generated_at
+              - column:
+                  name: requested_at

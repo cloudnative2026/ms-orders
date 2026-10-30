@@ -83,3 +83,25 @@ Debe usar los estados de esta API en espanol antes de gestionar transiciones des
 H2 en modo PostgreSQL, catalogo y decodificacion JWT simulados. Sin Docker ni llamadas a Entra.
 Cubren migraciones, CRUD, precios, validacion, estados y permisos.
 No reemplazan una prueba real de PostgreSQL/Entra/catalogo.
+
+## Boletas por RabbitMQ
+
+En Pedidos, Generar / ver boleta solicita un comprobante interno del pedido.
+POST /api/v1/orders/{id}/receipt devuelve 202 PENDING o 200 READY si ya existe.
+GET en la misma ruta devuelve NOT_REQUESTED, PENDING o READY con el HTML generado.
+Ambas operaciones aplican los roles y la propiedad del pedido; un Cliente no puede consultar boletas ajenas.
+
+La tabla order_receipt conserva una instantanea de los importes al solicitar el documento.
+Un despachador revisa solicitudes pendientes cada 5 segundos y envia el ID a
+receipts.exchange / receipts.generate / receipts.queue. El consumidor genera y guarda
+el comprobante. Las entregas duplicadas son idempotentes y las solicitudes pendientes
+se reintentan tras una caida de RabbitMQ. Los mensajes fallidos van a receipts.queue.dlq.
+La cola se declara al arrancar ms-orders; no requiere cambios en ms-notifications.
+
+La pagina consulta el estado, muestra el documento y permite descargar HTML o usar
+Imprimir / guardar PDF. El comprobante conserva los precios historicos y muestra el ID
+cuando el pedido no conserva el nombre del producto. No acredita pago ni emite documentos tributarios.
+Una boleta ya emitida conserva su instantanea aunque se edite posteriormente el pedido.
+Eliminar el pedido elimina tambien su boleta. La migracion 004 crea la tabla sin alterar los pedidos existentes.
+
+Pruebas: mvn test (17 pruebas, incluyendo acceso, instantanea, duplicados y reintento del publicador).
