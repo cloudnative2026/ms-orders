@@ -18,7 +18,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class OrderService {
     private final OrderRepository orders;
     private final CatalogClient catalog;
-    public OrderService(OrderRepository orders, CatalogClient catalog) {
+    private final com.cloudnative.ms_orders.repository.StatusEmailRepository emails;
+    public OrderService(OrderRepository orders, CatalogClient catalog, com.cloudnative.ms_orders.repository.StatusEmailRepository emails) {
+        this.emails = emails;
         this.orders = orders;
         this.catalog = catalog;
     }
@@ -31,6 +33,15 @@ public class OrderService {
         var result = staff(auth) ? orders.findAll() :
             orders.findByOwnerIssuerAndOwnerSubject(issuer(auth), auth.getToken().getSubject());
         return result.stream().map(this::response).toList();
+    }
+    public boolean syncOwnEmail(JwtAuthenticationToken auth) {
+        String email = OwnerEmail.from(auth);
+        if (email == null) return false;
+        // Only the authenticated original owner's orders may be updated, even for staff.
+        for (var order : orders.findByOwnerIssuerAndOwnerSubject(issuer(auth), auth.getToken().getSubject())) {
+            if (order.getOwnerEmail() == null) order.setOwnerEmail(email);
+        }
+        return true;
     }
     private Order requireOrder(long id) {
         return orders.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado."));
@@ -51,6 +62,7 @@ public class OrderService {
         order.setCustomerId(request.customerId());
         order.setOwnerIssuer(issuer(auth));
         order.setOwnerSubject(auth.getToken().getSubject());
+        order.setOwnerEmail(OwnerEmail.from(auth));
         order.setItems(priced.items());
         order.setStatus(OrderStatus.CREADO);
         order.setTotalAmount(priced.total());
@@ -97,6 +109,14 @@ public class OrderService {
             case ENTREGADO, CANCELADO -> false;
         };
         if (!allowed) throw new ResponseStatusException(HttpStatus.CONFLICT, "Transicion de estado no permitida.");
+        // Persist the event in the same transaction as the status change. No broker or SMTP call here.
+        var event = new StatusEmail();
+        event.setId(UUID.randomUUID().toString());event.setOrderId(order.getId());
+        event.setRecipient(order.getOwnerEmail());
+        event.setPreviousStatus(current.name());event.setNewStatus(target.name());
+        event.setOccurredAt(LocalDateTime.now());event.setNextAttemptAt(event.getOccurredAt());
+        event.setState(order.getOwnerEmail()==null ? "NO_RECIPIENT" : "PENDING");
+        emails.save(event);
         order.setStatus(target);
         order.setUpdatedAt(LocalDateTime.now());
         return response(orders.saveAndFlush(order));

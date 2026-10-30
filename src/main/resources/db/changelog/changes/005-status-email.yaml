@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-status-email
+      author: pedidos360
+      changes:
+        - addColumn:
+            tableName: orders
+            columns:
+              - column:
+                  name: owner_email
+                  type: VARCHAR(320)
+        - createTable:
+            tableName: status_email
+            columns:
+              - column:
+                  name: id
+                  type: VARCHAR(36)
+                  constraints: {primaryKey: true, nullable: false}
+              - column:
+                  name: order_id
+                  type: BIGINT
+                  constraints: {nullable: false}
+              - column:
+                  name: recipient
+                  type: VARCHAR(320)
+              - column:
+                  name: previous_status
+                  type: VARCHAR(30)
+                  constraints: {nullable: false}
+              - column:
+                  name: new_status
+                  type: VARCHAR(30)
+                  constraints: {nullable: false}
+              - column:
+                  name: occurred_at
+                  type: TIMESTAMP
+                  constraints: {nullable: false}
+              - column:
+                  name: state
+                  type: VARCHAR(30)
+                  constraints: {nullable: false}
+              - column:
+                  name: attempts
+                  type: INT
+                  constraints: {nullable: false}
+              - column:
+                  name: next_attempt_at
+                  type: TIMESTAMP
+                  constraints: {nullable: false}
+              - column:
+                  name: sent_at
+                  type: TIMESTAMP
+        - createIndex:
+            tableName: status_email
+            indexName: idx_status_email_pending
+            columns:
+              - column: {name: state}
+              - column: {name: next_attempt_at}

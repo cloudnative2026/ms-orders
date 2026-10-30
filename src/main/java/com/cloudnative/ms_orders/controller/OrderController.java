@@ -26,6 +26,11 @@ public class OrderController {
         this.notifications = notifications;
     }
 
+    @PostMapping("/notification-contact")
+    public java.util.Map<String, Boolean> notificationContact(JwtAuthenticationToken auth) {
+        return java.util.Map.of("emailAvailable", service.syncOwnEmail(auth));
+    }
+
     @GetMapping
     public List<OrderResponseDTO> getAll(JwtAuthenticationToken auth) {
         return service.findAll(auth);

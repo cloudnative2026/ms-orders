@@ -23,6 +23,8 @@ public class Order {
     private String ownerSubject;
     @Column(length = 255)
     private String ownerIssuer;
+    @Column(length = 320)
+    private String ownerEmail;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private OrderStatus status;

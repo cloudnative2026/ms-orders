@@ -105,3 +105,48 @@ Una boleta ya emitida conserva su instantanea aunque se edite posteriormente el 
 Eliminar el pedido elimina tambien su boleta. La migracion 004 crea la tabla sin alterar los pedidos existentes.
 
 Pruebas: mvn test (17 pruebas, incluyendo acceso, instantanea, duplicados y reintento del publicador).
+## Correo de cambios de estado (prueba local)
+
+El Compose general inicia Mailpit. Bandeja: http://localhost:8025, SMTP interno: mailpit:1025.
+Los mensajes quedan capturados localmente y no se reenvian a Gmail ni Microsoft.
+Documentacion de Mailpit: https://mailpit.axllent.org/docs/install/docker/
+
+Al crear el pedido se guarda el correo de su creador desde los claims firmados email,
+preferred_username o upn, validando que sean una direccion. No se usa el correo del
+administrador que cambia el estado ni customerId para decidir el destinatario.
+El correo no se incluye en las respuestas publicas de pedidos ni en el mensaje RabbitMQ.
+
+Para pedidos anteriores, el creador debe abrir Pedidos: la pagina hace POST
+/api/v1/orders/notification-contact y completa solo los correos faltantes de los pedidos
+pertenecientes al issuer y subject de esa cuenta. Esta operacion no modifica otros pedidos,
+incluso cuando quien la ejecuta es Admin. Si el token no trae correo, la pagina lo indica;
+es necesario configurar Entra ID para incluir un claim de correo apropiado en el access token.
+No se deduce un correo a partir del identificador numerico de cliente.
+
+Cada cambio real de estado escribe un registro status_email en la misma transaccion del pedido.
+No-op (mismo estado), errores de permisos y transiciones invalidas no generan correos.
+El despachador publica el ID de evento cada 5 segundos por orders.status.exchange,
+routing key status.changed, cola orders.status.email.queue. Su consumidor en ms-orders
+recupera el destinatario y los estados de la base y envia por SMTP. La cola es durable,
+con orders.status.email.queue.dlq para entregas rechazadas. El correo pendiente permanece
+registrado aunque RabbitMQ no este disponible. El pedido no depende de la disponibilidad de SMTP.
+
+Estados de seguimiento en status_email: PENDING, SENT, NO_RECIPIENT y FAILED.
+Los fallos SMTP se reintentan hasta 5 veces, con espera de 30 segundos multiplicada
+por el intento. Al agotarlos queda FAILED para revision. NO_RECIPIENT indica que no habia
+correo al cambiar el estado; esos eventos no se envian retroactivamente al sincronizar contacto.
+El consumidor bloquea el registro y omite eventos ya enviados. SMTP no garantiza exactamente
+una entrega ante una caida entre la aceptacion del correo y el commit de la base.
+La tabla conserva el evento historico incluso si se elimina el pedido.
+
+Configuracion disponible en application.properties: SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+SMTP_PASSWORD, SMTP_AUTH, SMTP_STARTTLS y MAIL_FROM. El Compose local fija mailpit y un
+remitente ficticio; para envio real hay que cambiar esos valores de entorno de ms-orders.
+Nunca guardar credenciales reales en el repositorio. Mailpit no tiene relay configurado.
+
+Validacion: 22 pruebas normales del backend y EmailLocalSmokeTest, que ejecuta un cambio
+por MockMvc con JWT simulado y usa RabbitMQ + SMTP reales en un vhost aislado y H2.
+La prueba real solo corre con RUN_LOCAL_MAIL_SMOKE=true; requiere el vhost codex-mail-smoke
+con permisos para el usuario RabbitMQ y que el contenedor de pruebas este en la red del Compose.
+El mensaje de ejemplo en Mailpit usa cliente-prueba@example.test y el pedido #1 de una base
+H2 temporal; no corresponde a un pedido del usuario en PostgreSQL.

@@ -26,6 +26,9 @@ import static org.assertj.core.api.Assertions.*;
 class MsOrdersApplicationTests {
     @Autowired MockMvc mvc;
     @Autowired OrderRepository orders;
+    @Autowired com.cloudnative.ms_orders.repository.StatusEmailRepository statusEmails;
+    @Autowired com.cloudnative.ms_orders.service.StatusEmailDelivery emailDelivery;
+    @MockitoBean org.springframework.mail.javamail.JavaMailSender mailSender;
     @Autowired com.cloudnative.ms_orders.service.ReceiptService receiptService;
     @Autowired com.cloudnative.ms_orders.repository.ReceiptRepository receipts;
     @MockitoBean JwtDecoder decoder;
@@ -36,6 +39,7 @@ class MsOrdersApplicationTests {
         {"customerId":101,"items":[{"productId":1,"quantity":2}]}
         """;
     @BeforeEach void setup() {
+        statusEmails.deleteAll();
         receipts.deleteAll();
         orders.deleteAll();
         for (String role : List.of("Admin", "Operador", "Cliente", "Auditor")) token(role, role, role);
@@ -222,5 +226,99 @@ class MsOrdersApplicationTests {
             .andExpect(status().isAccepted());
         mvc.perform(get(location + "/receipt").header("Authorization", "Bearer Cliente"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    void emailToken(String value, String role, String subject, String claim, String email) {
+        when(decoder.decode(value)).thenReturn(Jwt.withTokenValue(value).header("alg", "RS256")
+            .issuer("https://issuer.example").subject(subject).claim("roles", List.of(role))
+            .claim(claim, email).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(300)).build());
+    }
+    String customerOrder() throws Exception {
+        return mvc.perform(post(URL).header("Authorization", "Bearer Cliente")
+            .contentType("application/json").content(BODY)).andExpect(status().isCreated())
+            .andReturn().getResponse().getHeader("Location");
+    }
+    @Test void statusEmailTargetsOriginalOwnerAndDuplicateStatusDoesNotSendAgain() throws Exception {
+        emailToken("Cliente", "Cliente", "Cliente", "email", "original@example.test");
+        emailToken("Admin", "Admin", "Admin", "email", "admin@example.test");
+        String location=customerOrder();
+        for (int i=0;i<2;i++) mvc.perform(patch(location+"/status").param("status","ACEPTADO")
+            .header("Authorization","Bearer Admin")).andExpect(status().isOk());
+        assertThat(statusEmails.count()).isEqualTo(1);
+        var event=statusEmails.findAll().getFirst();
+        assertThat(event.getRecipient()).isEqualTo("original@example.test");
+        assertThat(event.getPreviousStatus()).isEqualTo("CREADO");
+        assertThat(event.getNewStatus()).isEqualTo("ACEPTADO");
+        verifyNoInteractions(mailSender);
+        emailDelivery.deliver(event.getId());
+        emailDelivery.deliver(event.getId());
+        var message=org.mockito.ArgumentCaptor.forClass(org.springframework.mail.SimpleMailMessage.class);
+        verify(mailSender,times(1)).send(message.capture());
+        assertThat(message.getValue().getTo()).containsExactly("original@example.test");
+        assertThat(message.getValue().getText()).contains("Creado","Aceptado");
+        assertThat(statusEmails.findById(event.getId()).orElseThrow().getState()).isEqualTo("SENT");
+        mvc.perform(patch(location+"/status").param("status","ENTREGADO")
+            .header("Authorization","Bearer Admin")).andExpect(status().isConflict());
+        assertThat(statusEmails.count()).isEqualTo(1);
+    }
+    @Test void smtpFailurePreservesStatusAndRetriesPendingEmail() throws Exception {
+        emailToken("Cliente","Cliente","Cliente","preferred_username","customer@example.test");
+        String location=customerOrder();
+        mvc.perform(patch(location+"/status").param("status","CANCELADO")
+            .header("Authorization","Bearer Admin")).andExpect(status().isOk());
+        var event=statusEmails.findAll().getFirst();
+        doThrow(new org.springframework.mail.MailSendException("offline")).doNothing()
+            .when(mailSender).send(any(org.springframework.mail.SimpleMailMessage.class));
+        emailDelivery.deliver(event.getId());
+        event=statusEmails.findById(event.getId()).orElseThrow();
+        assertThat(event.getState()).isEqualTo("PENDING");assertThat(event.getAttempts()).isEqualTo(1);
+        assertThat(event.getNextAttemptAt()).isAfter(java.time.LocalDateTime.now());
+        mvc.perform(get(location).header("Authorization","Bearer Cliente"))
+            .andExpect(jsonPath("$.status").value("CANCELADO"));
+        event.setNextAttemptAt(java.time.LocalDateTime.now().minusSeconds(1));statusEmails.saveAndFlush(event);
+        emailDelivery.deliver(event.getId());
+        assertThat(statusEmails.findById(event.getId()).orElseThrow().getState()).isEqualTo("SENT");
+    }
+    @Test void missingEmailNeverUsesAdministratorsAddress() throws Exception {
+        emailToken("Admin","Admin","Admin","email","admin@example.test");
+        String location=customerOrder();
+        mvc.perform(patch(location+"/status").param("status","ACEPTADO")
+            .header("Authorization","Bearer Admin")).andExpect(status().isOk());
+        var event=statusEmails.findAll().getFirst();
+        assertThat(event.getState()).isEqualTo("NO_RECIPIENT");assertThat(event.getRecipient()).isNull();
+        emailDelivery.deliver(event.getId());verifyNoInteractions(mailSender);
+    }
+    @Test void contactSyncOnlyFillsOriginalOwnersOrdersAndRejectsHeaderInjection() throws Exception {
+        String location=customerOrder();
+        long id=Long.parseLong(location.substring(location.lastIndexOf('/')+1));
+        emailToken("Admin","Admin","Admin","email","admin@example.test");
+        mvc.perform(post(URL+"/notification-contact").header("Authorization","Bearer Admin"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.emailAvailable").value(true));
+        assertThat(orders.findById(id).orElseThrow().getOwnerEmail()).isNull();
+        emailToken("Cliente","Cliente","Cliente","email","bad@example.test\r\nBcc: other@example.test");
+        mvc.perform(post(URL+"/notification-contact").header("Authorization","Bearer Cliente"))
+            .andExpect(jsonPath("$.emailAvailable").value(false));
+        emailToken("Cliente","Cliente","Cliente","upn","owner@example.test");
+        mvc.perform(post(URL+"/notification-contact").header("Authorization","Bearer Cliente"))
+            .andExpect(jsonPath("$.emailAvailable").value(true));
+        assertThat(orders.findById(id).orElseThrow().getOwnerEmail()).isEqualTo("owner@example.test");
+    }
+    @Test void emailDeliveryStopsAfterFiveFailures() throws Exception {
+        emailToken("Cliente","Cliente","Cliente","email","owner@example.test");
+        String location=customerOrder();
+        mvc.perform(patch(location+"/status").param("status","ACEPTADO")
+            .header("Authorization","Bearer Admin")).andExpect(status().isOk());
+        var event=statusEmails.findAll().getFirst();
+        doThrow(new org.springframework.mail.MailSendException("offline"))
+            .when(mailSender).send(any(org.springframework.mail.SimpleMailMessage.class));
+        for(int i=0;i<5;i++) {
+            event=statusEmails.findById(event.getId()).orElseThrow();
+            event.setNextAttemptAt(java.time.LocalDateTime.now().minusSeconds(1));statusEmails.saveAndFlush(event);
+            emailDelivery.deliver(event.getId());
+        }
+        event=statusEmails.findById(event.getId()).orElseThrow();
+        assertThat(event.getState()).isEqualTo("FAILED");assertThat(event.getAttempts()).isEqualTo(5);
+        emailDelivery.deliver(event.getId());
+        verify(mailSender,times(5)).send(any(org.springframework.mail.SimpleMailMessage.class));
     }
 }
