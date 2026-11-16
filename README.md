@@ -21,6 +21,10 @@ DB_USERNAME, DB_PASSWORD, SERVER_PORT, ENTRA_ISSUER y ENTRA_AUDIENCE.
 Las credenciales locales de ejemplo no son para despliegue. Se conserva soporte para .env.
 El puerto 5433 coincide con db-orders del compose general: usar una sola de esas bases.
 Hibernate valida; solo Liquibase cambia el esquema.
+Kafka: SPRING_KAFKA_BOOTSTRAP_SERVERS (predeterminado localhost:9092). Cada cambio confirmado de un pedido
+se publica en `orders.events` (evento de negocio con el pedido, clave = id del pedido) y en `audit.timeline`
+(actor, roles, IP y user-agent, clave = id del evento). ms-orders crea ambos topicos. Si Kafka no responde,
+la operacion se completa igual y el evento se pierde (queda en el log).
 Las migraciones anteriores se conservan. La migracion 003 agrega version e identidad y convierte importes a decimales.
 Los pedidos existentes sin identidad solo son visibles para Admin/Operador.
 Los datos ficticios se cargan solo con SPRING_LIQUIBASE_CONTEXTS=demo, en PostgreSQL y bases nuevas.

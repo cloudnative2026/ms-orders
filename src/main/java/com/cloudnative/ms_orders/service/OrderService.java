@@ -7,6 +7,7 @@ import com.cloudnative.ms_orders.client.CatalogClient;
 import com.cloudnative.ms_orders.dto.*;
 import com.cloudnative.ms_orders.model.*;
 import com.cloudnative.ms_orders.repository.OrderRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,10 @@ public class OrderService {
     private final OrderRepository orders;
     private final CatalogClient catalog;
     private final com.cloudnative.ms_orders.repository.StatusEmailRepository emails;
-    public OrderService(OrderRepository orders, CatalogClient catalog, com.cloudnative.ms_orders.repository.StatusEmailRepository emails) {
+    private final ApplicationEventPublisher events;
+    public OrderService(OrderRepository orders, CatalogClient catalog, com.cloudnative.ms_orders.repository.StatusEmailRepository emails,
+            ApplicationEventPublisher events) {
+        this.events = events;
         this.emails = emails;
         this.orders = orders;
         this.catalog = catalog;
@@ -68,7 +72,9 @@ public class OrderService {
         order.setTotalAmount(priced.total());
         order.setCreatedAt(LocalDateTime.now());
         order.setUpdatedAt(order.getCreatedAt());
-        return response(orders.saveAndFlush(order));
+        var saved = response(orders.saveAndFlush(order));
+        events.publishEvent(new OrderChangedEvent("OrderCreated", saved, "Pedido creado"));
+        return saved;
     }
     public OrderResponseDTO updateOrder(long id, OrderRequestDTO request, JwtAuthenticationToken auth) {
         var order = visibleOrder(id, auth);
@@ -79,7 +85,9 @@ public class OrderService {
         order.setItems(replacement.items());
         order.setTotalAmount(replacement.total());
         order.setUpdatedAt(LocalDateTime.now());
-        return response(orders.saveAndFlush(order));
+        var saved = response(orders.saveAndFlush(order));
+        events.publishEvent(new OrderChangedEvent("OrderUpdated", saved, "Pedido editado"));
+        return saved;
     }
     private record PricedItems(List<OrderItem> items, BigDecimal total) {}
     private PricedItems priceItems(OrderRequestDTO request, JwtAuthenticationToken auth) {
@@ -119,10 +127,13 @@ public class OrderService {
         emails.save(event);
         order.setStatus(target);
         order.setUpdatedAt(LocalDateTime.now());
-        return response(orders.saveAndFlush(order));
+        var saved = response(orders.saveAndFlush(order));
+        events.publishEvent(new OrderChangedEvent(OrderChangedEvent.statusType(target), saved, current + " -> " + target));
+        return saved;
     }
     public void deleteOrder(long id) {
         var order = requireOrder(id);
+        events.publishEvent(new OrderChangedEvent("OrderDeleted", response(order), "Pedido eliminado"));
         orders.delete(order);
         orders.flush();
     }
