@@ -34,6 +34,7 @@ class MsOrdersApplicationTests {
     @MockitoBean JwtDecoder decoder;
     @MockitoBean CatalogClient catalog;
     @MockitoBean NotificationClient notifications;
+    @MockitoBean com.cloudnative.ms_orders.client.OrderEventPublisher orderEvents;
     static final String URL = "/api/v1/orders";
     static final String BODY = """
         {"customerId":101,"items":[{"productId":1,"quantity":2}]}
