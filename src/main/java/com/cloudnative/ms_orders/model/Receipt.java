@@ -12,8 +12,8 @@ import org.hibernate.type.SqlTypes;
 @Getter @Setter
 public class Receipt {
     @Id private Long orderId;
-    @JdbcTypeCode(SqlTypes.LONG32VARCHAR) @Column(nullable = false) private String snapshot;
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR) @Column(nullable = false, columnDefinition = "TEXT") private String snapshot;
     @Column(nullable = false) private LocalDateTime requestedAt;
     private LocalDateTime generatedAt;
-    @JdbcTypeCode(SqlTypes.LONG32VARCHAR) private String html;
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR) @Column(columnDefinition = "TEXT") private String html;
 }
