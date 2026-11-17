@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/db.changelog-master.yaml
+      relativeToChangelogFile: false
+  # Liquibase translates TEXT to CLOB on H2. Use H2's large VARCHAR
+  # equivalent so Hibernate can validate the production LONGVARCHAR mapping.
+  - changeSet:
+      id: test-h2-receipt-text
+      author: ms-orders
+      dbms: h2
+      changes:
+        - modifyDataType:
+            tableName: order_receipt
+            columnName: snapshot
+            newDataType: VARCHAR(1000000000)
+        - modifyDataType:
+            tableName: order_receipt
+            columnName: html
+            newDataType: VARCHAR(1000000000)
